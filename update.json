@@ -1,6 +1,6 @@
 {
-    "version": "v0.26",
-    "versionCode": 26,
-    "zipUrl": "https://gitlab.com/d4rcm4rc/MagiskSSH_releases/-/raw/main/magisk_ssh_v0.26.zip",
-    "changelog": "https://gitlab.com/d4rcm4rc/MagiskSSH/-/raw/main/module_data/README.md"
+    "version": "v0.27",
+    "versionCode": 27,
+    "zipUrl": "https://github.com/chisewaguri/ksu-ssh/releases/-/raw/main/ksu_ssh_v0.27.zip",
+    "changelog": "https://github.com/chisewaguri/ksu-ssh/-/raw/main/module_data/README.md"
 }

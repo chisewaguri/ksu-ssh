@@ -34,8 +34,8 @@ $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared $
 	  --sysconfdir=/data/ssh --with-pid-dir=/data/ssh                                      \
 	  --libexecdir=/data/adb/ssh/usr/libexec/ssh-core                                      \
 	  --with-maildir=/var/mail                                                             \
-	  --with-default-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/magisk/ssh/usr/bin:/data/adb/ksu/bin:/data/adb/ap/bin"      \
-	  --with-superuser-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/magisk/ssh/usr/bin:/data/adb/ksu/bin:/data/adb/ap/bin"    \
+	  --with-default-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/data/adb/ksu/bin:/data/adb/ap/bin"      \
+	  --with-superuser-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/data/adb/ksu/bin:/data/adb/ap/bin"   \
 	  --with-privsep-user=root --with-privsep-path=/
 	sed -i -e 's:/\* #undef HAVE_MBLEN \*/:#define HAVE_MBLEN 1:'                          \
 	       -e 's:/\* #undef HAVE_ENDGRENT \*/:#define HAVE_ENDGRENT 1:'                    \

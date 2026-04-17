@@ -1,7 +1,9 @@
-MagiskSSH
-=========
+KSU SSH
+=======
 
-This is an SSH server running as root using the great Magisk systemless root suite. It includes binaries for arm, arm64, x86, x86_64. However, only arm64 has been tested at all. It requires Android API version 24 or higher (Android 7.0 Nougat and higher).
+> Based on [MagiskSSH](https://gitlab.com/d4rcm4rc/MagiskSSH) by D4rCM4rC and Contributors. Licensed under GPL v3.
+
+This is an SSH server running as root for Android devices with KernelSU or APatch. It includes binaries for arm, arm64, x86, x86_64. However, only arm64 has been tested at all. It requires Android API version 24 or higher (Android 7.0 Nougat and higher).
 
 ## Included software
 
@@ -12,8 +14,8 @@ This is an SSH server running as root using the great Magisk systemless root sui
 
 ## Installation
 
-Download the zip file and install it via the Magisk Manager app.
-Updates can be installed from within Magisk Manager itself.
+Download the zip file and install it via the KernelSU or APatch manager app.
+Updates can be installed from within the manager app itself.
 
 ## Configuration
 
@@ -29,11 +31,11 @@ The ssh daemon automatically starts on device boot. If this is undesired, you ca
 Once you have written a valid SSH public key into an `authorized_keys` file (see section 'Configuration' above), you can connect to the device using `ssh shell@<device_ip>` (unprivileged access) or `ssh root@<device_ip>` (privileged access), while supplying the correct private key. You will drop into a shell on the device. sftp and rsync should work as usual.
 
 If you want to manually start/stop the sshd-service, you may do so using `/data/adb/modules/ssh/opensshd.init start` and `/data/adb/modules/ssh/opensshd.init stop`. This is usually not necessary but may be useful if you use the `no-autostart` file described earlier.
-Note that the `opensshd.init` script may be in a different place on your device. Magisk explicitly does not give any guarantees about the install location and is free to change it.
+Note that the `opensshd.init` script may be in a different place on your device. The module system does not give any guarantees about the install location and is free to change it.
 
 ## Uninstallation
 
-Uninstalling the module via the Magisk Manager should also delete the `/data/ssh` directory.
+Uninstalling the module via the manager app should also delete the `/data/ssh` directory.
 This contains the host keys for the SSH server and the home directories for the SSH users.
 Thus, uninstalling via the Manager should get rid of all traces of this module.
 
@@ -41,20 +43,20 @@ If you wish to keep the runtime data for a later reinstallation of the module, c
 
 ## Contributing
 
-Feel free to create a Merge Request against the [source repository](https://gitlab.com/d4rcm4rc/MagiskSSH).
+Feel free to create a Merge Request against the source repository.
 
 Over time, this project has worked with a few repositories
-(Magisk module repo, source repo at GitHub/GitLab, releases repo).
+(KSU/APatch module repo, source repo at GitHub/GitLab, releases repo).
 Only the aforementioned source repository can accept contributions.
 The other repositories are dead-ends for different reasons.
 
 ## License
 
-[GPL v3](https://gitlab.com/d4rcm4rc/MagiskSSH/blob/main/LICENSE)
+[GPL v3](https://github.com/chisewaguri/ksu-ssh/blob/main/LICENSE)
 
 ## Links
 
-[Source Code Repository](https://gitlab.com/d4rcm4rc/MagiskSSH)
+[Source Code Repository](https://github.com/chisewaguri/ksu-ssh)
 
 ## Changelog
 

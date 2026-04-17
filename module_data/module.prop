@@ -1,7 +1,6 @@
-id=ssh
-name=SSH for Magisk
+id=ksu-ssh
+name=KSU SSH
 version=v0.26
 versionCode=26
-author=D4rCM4rC and Contributors
-description=OpenSSH and Rsync bundled with simple start scripts for Android with Magisk
-updateJson=https://gitlab.com/d4rcm4rc/MagiskSSH/-/raw/main/update.json
+author=chisewaguri, D4rCM4rC and Contributors
+description=OpenSSH and Rsync for Android with KernelSU / APatch
