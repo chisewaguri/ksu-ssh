@@ -7,7 +7,9 @@ ARCHIVE_NAME:=$(OPENSSL).tar.gz
 DOWNLOAD_URL:=https://www.openssl.org/source/$(ARCHIVE_NAME)
 LIBCRYPTO_VERSION:=3
 
-PACKAGE_INSTALLED_FILES:=$(BUILD_DIR)/usr/lib/libcrypto.so
+PACKAGE_INSTALLED_FILES:=$(BUILD_DIR)/usr/lib/libcrypto.so \
+                          $(BUILD_DIR)/usr/lib/libssl.so    \
+                          $(BUILD_DIR)/usr/bin/openssl
 
 define pkg-targets
 $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared
@@ -26,6 +28,16 @@ $(BUILD_DIR)/usr/lib/libcrypto.so: $(BUILD_DIR)/$(PACKAGE)/stamp.built
 	mkdir -p $(BUILD_DIR)/usr/lib/
 	cp -u "$(BUILD_DIR)/$(PACKAGE)/libcrypto.so" "$(BUILD_DIR)/usr/lib/"
 	$(STRIP) "$(BUILD_DIR)/usr/lib/libcrypto.so"
+
+$(BUILD_DIR)/usr/lib/libssl.so: $(BUILD_DIR)/$(PACKAGE)/stamp.built
+	mkdir -p $(BUILD_DIR)/usr/lib/
+	cp -u "$(BUILD_DIR)/$(PACKAGE)/libssl.so" "$(BUILD_DIR)/usr/lib/"
+	$(STRIP) "$(BUILD_DIR)/usr/lib/libssl.so"
+
+$(BUILD_DIR)/usr/bin/openssl: $(BUILD_DIR)/$(PACKAGE)/stamp.built
+	mkdir -p $(BUILD_DIR)/usr/bin/
+	cp -u "$(BUILD_DIR)/$(PACKAGE)/apps/openssl" "$(BUILD_DIR)/usr/bin/"
+	$(STRIP) "$(BUILD_DIR)/usr/bin/openssl"
 endef
 
 $(eval $(package))

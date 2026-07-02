@@ -1,10 +1,12 @@
 diff '--color=auto' -urN a/android-tweaks.c b/android-tweaks.c
 --- a/android-tweaks.c	1970-01-01 01:00:00.000000000 +0100
 +++ b/android-tweaks.c	2026-02-07 10:20:52.610519597 +0100
-@@ -0,0 +1,159 @@
+@@ -0,0 +1,209 @@
 +#include "android-tweaks.h"
 +#include <stdlib.h>
 +#include <limits.h>
++#include <stdio.h>
++#include <string.h>
 +#include "config.h"
 +
 +//char *sshelper_user = NULL;
@@ -55,7 +57,7 @@ diff '--color=auto' -urN a/android-tweaks.c b/android-tweaks.c
 +		pw->pw_dir = new_dir;
 +	}
 +	if(pw) {
-+		pw->pw_passwd="";
++		pw->pw_passwd="x";
 +#ifdef HAVE_STRUCT_PASSWD_PW_GECOS
 +		pw->pw_gecos="";
 +#endif
@@ -83,7 +85,7 @@ diff '--color=auto' -urN a/android-tweaks.c b/android-tweaks.c
 +		pw->pw_dir = new_dir;
 +	}
 +	if(pw) {
-+		pw->pw_passwd="";
++		pw->pw_passwd="x";
 +#ifdef HAVE_STRUCT_PASSWD_PW_GECOS
 +		pw->pw_gecos="";
 +#endif
@@ -120,9 +122,57 @@ diff '--color=auto' -urN a/android-tweaks.c b/android-tweaks.c
 +// 	return 0;
 +// }
 +//
-+// struct spwd *getspnam(const char *name) {
-+// 	return NULL;
-+// }
++struct spwd *getspnam(const char *name) {
++	static struct spwd sp;
++	static char buf[1024];
++	static char namebuf[64];
++	static char passbuf[256];
++	FILE *fp;
++	char *saveptr, *token;
++
++	fp = fopen("/data/ssh/etc/shadow", "r");
++	if (fp == NULL)
++		return NULL;
++
++	while (fgets(buf, sizeof(buf), fp) != NULL) {
++		/* strip trailing newline */
++		buf[strcspn(buf, "\n")] = '\0';
++
++		token = strtok_r(buf, ":", &saveptr);
++		if (token == NULL || strcmp(token, name) != 0)
++			continue;
++
++		/* username */
++		strncpy(namebuf, token, sizeof(namebuf) - 1);
++		namebuf[sizeof(namebuf) - 1] = '\0';
++		sp.sp_namp = namebuf;
++
++		/* password hash */
++		token = strtok_r(NULL, ":", &saveptr);
++		if (token != NULL) {
++			strncpy(passbuf, token, sizeof(passbuf) - 1);
++			passbuf[sizeof(passbuf) - 1] = '\0';
++		} else {
++			passbuf[0] = '\0';
++		}
++		sp.sp_pwdp = passbuf;
++
++		/* remaining fields defaulted */
++		sp.sp_lstchg = -1;
++		sp.sp_min = -1;
++		sp.sp_max = -1;
++		sp.sp_warn = -1;
++		sp.sp_inact = -1;
++		sp.sp_expire = -1;
++		sp.sp_flag = -1;
++
++		fclose(fp);
++		return &sp;
++	}
++
++	fclose(fp);
++	return NULL;
++}
 +//
 +// int initgroups(const char *user, gid_t group) {
 +// 	return 0;
@@ -164,23 +214,57 @@ diff '--color=auto' -urN a/android-tweaks.c b/android-tweaks.c
 diff '--color=auto' -urN a/android-tweaks.h b/android-tweaks.h
 --- a/android-tweaks.h	1970-01-01 01:00:00.000000000 +0100
 +++ b/android-tweaks.h	2026-02-07 10:20:52.610519597 +0100
-@@ -0,0 +1,16 @@
+@@ -0,0 +1,32 @@
 +#include <sys/types.h>
 +#include <pwd.h>
 +#include <unistd.h>
 +#include <netdb.h>
++
++#ifndef ANDROID_SPWD_GUARD
++#define ANDROID_SPWD_GUARD
++struct spwd {
++    char *sp_namp;
++    char *sp_pwdp;
++    long sp_lstchg;
++    long sp_min;
++    long sp_max;
++    long sp_warn;
++    long sp_inact;
++    long sp_expire;
++    unsigned long sp_flag;
++};
++#endif
 +
 +#ifndef ANDROID_TWEAKS_H
 +#define ANDROID_TWEAKS_H
 +
 +struct passwd* getpwuida(uid_t uid);
 +struct passwd* getpwnama(const char *name);
++struct spwd *getspnam(const char *name);
 +
 +const char* get_path_android(char root);
 +
 +//char *sshelper_user;
 +
 +#endif
+
+diff '--color=auto' -urN a/openbsd-compat/xcrypt.c b/openbsd-compat/xcrypt.c
+--- a/openbsd-compat/xcrypt.c	2025-10-10 04:38:31.000000000 +0200
++++ b/openbsd-compat/xcrypt.c	2026-02-07 10:20:52.610519597 +0100
+@@ -47,10 +47,12 @@
+
+ # if defined(HAVE_SHADOW_H) && !defined(DISABLE_SHADOW)
++# ifndef __ANDROID__
+ #  include <shadow.h>
++# endif
+ # endif
+
+ # if defined(HAVE_GETPWANAM) && !defined(DISABLE_SHADOW)
+ #  include <sys/label.h>
+ #  include <sys/audit.h>
+ #  include <pwdadj.h>
+ # endif
+
 diff '--color=auto' -urN a/auth2-pubkey.c b/auth2-pubkey.c
 --- a/auth2-pubkey.c	2025-10-10 04:38:31.000000000 +0200
 +++ b/auth2-pubkey.c	2026-02-07 10:20:52.610519597 +0100
@@ -205,6 +289,14 @@ diff '--color=auto' -urN a/auth2-pubkey.c b/auth2-pubkey.c
 diff '--color=auto' -urN a/auth.c b/auth.c
 --- a/auth.c	2025-10-10 04:38:31.000000000 +0200
 +++ b/auth.c	2026-02-07 10:20:52.610519597 +0100
+@@ -43,5 +43,7 @@
+ #endif
+ #ifdef USE_SHADOW
++#ifndef __ANDROID__
+ #include <shadow.h>
++#endif
+ #endif
+ #include <stdarg.h>
 @@ -474,7 +474,7 @@
  
  	ci = server_get_connection_info(ssh, 1, options.use_dns);

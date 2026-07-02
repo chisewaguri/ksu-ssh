@@ -7,7 +7,7 @@ This is an SSH server running as root for Android devices with KernelSU or APatc
 
 ## Included software
 
-* [OpenSSL 3.6.1](https://www.openssl.org/) (only needed for its libcrypto)
+* [OpenSSL 3.6.1](https://www.openssl.org/)
 * [OpenSSH 10.2p1](https://www.openssh.com/)
 * [Rsync 3.4.1](https://rsync.samba.org/)
 * [Magisk Module Installer](https://github.com/topjohnwu/magisk-module-installer)
@@ -22,16 +22,36 @@ Updates can be installed from within the manager app itself.
 SSH keys can be put into `/data/ssh/root/.ssh/authorized_keys` and `/data/ssh/shell/.ssh/authorized_keys` using your favorite method of editing files.
 Note that this file must be owned by the respective user and should have `600` permissions (owner: rw, everyone else: nothing).
 
-The sshd configuration file in `/data/ssh/sshd_config` can be edited as well, but please be aware that some features usually present in an OpenSSH installation may be missing. Most importantly, password login is not possible using this package.
+The sshd configuration file in `/data/ssh/sshd_config` can be edited as well, but please be aware that some features usually present in an OpenSSH installation (such as PAM) may be missing.
+
+### Password Authentication
+
+Password authentication for SSH can be enabled with root.
+To set a password for the `root` or `shell` user, run the following as root on
+the device (for example, via terminal emulator or adb shell):
+
+    passwd root
+
+or
+
+    passwd shell
+
+You will be prompted for a password. After setting the password, standard SSH
+password authentication will be available on the next login attempt.
+
+Passwords are stored as SHA-512 crypt hashes in `/data/ssh/etc/shadow`. If you
+reinstall the module, you will need to set passwords again.
+
+To disable password authentication, change `/data/ssh/sshd_config` and set
+`PasswordAuthentication no`, then restart the SSH daemon.
 
 The ssh daemon automatically starts on device boot. If this is undesired, you can create a file `/data/ssh/no-autostart`. It will not start the service then.
 
 ## Usage
 
-Once you have written a valid SSH public key into an `authorized_keys` file (see section 'Configuration' above), you can connect to the device using `ssh shell@<device_ip>` (unprivileged access) or `ssh root@<device_ip>` (privileged access), while supplying the correct private key. You will drop into a shell on the device. sftp and rsync should work as usual.
+Once you have written a valid SSH public key into an `authorized_keys` file (see section 'Configuration' above) or set a password using `passwd`, you can connect to the device using `ssh shell@<device_ip>` (unprivileged access) or `ssh root@<device_ip>` (privileged access), while supplying the correct private key or password. You will drop into a shell on the device. sftp and rsync should work as usual.
 
-If you want to manually start/stop the sshd-service, you may do so using `/data/adb/modules/ssh/opensshd.init start` and `/data/adb/modules/ssh/opensshd.init stop`. This is usually not necessary but may be useful if you use the `no-autostart` file described earlier.
-Note that the `opensshd.init` script may be in a different place on your device. The module system does not give any guarantees about the install location and is free to change it.
+If you want to manually start/stop the sshd service, you may do so using the `opensshd.init` script in the module directory. This is usually not necessary but may be useful if you use the `no-autostart` file described earlier.
 
 ## Uninstallation
 
@@ -59,6 +79,12 @@ The other repositories are dead-ends for different reasons.
 [Source Code Repository](https://github.com/chisewaguri/ksu-ssh)
 
 ## Changelog
+
+###### 2026-07-02, v0.27
+
+- Add password authentication support (SHA-512 crypt)
+- Implement getspnam() with /data/ssh/etc/shadow backend
+- Add passwd utility for on-device password management
 
 ###### 2026-02-07, v0.26
 

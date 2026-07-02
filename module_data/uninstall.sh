@@ -1,17 +1,14 @@
-if ! test -e /data/ssh/KEEP_ON_UNINSTALL ; then
-    rm -rf /data/ssh
-fi
+test -e /data/ssh/KEEP_ON_UNINSTALL || rm -rf /data/ssh
 rm -rf /data/adb/ssh
 
-# remove symlink if ksu or ap
 if [ "$KSU" = true ]; then
     BINDIR=/data/adb/ksu/bin
 elif [ "$APATCH" = true ]; then
     BINDIR=/data/adb/ap/bin
+else
+    exit 0
 fi
 
-if [ "$KSU" = true ] || [ "$APATCH" = true ]; then
-    for f in scp sftp sftp-server ssh ssh-keygen sshd sshd-session sshd-auth rsync; do
-        rm -rf "$BINDIR/$f"
-    done
-fi
+for f in scp sftp sftp-server ssh ssh-keygen sshd sshd-session sshd-auth rsync openssl passwd; do
+    rm -f "$BINDIR/$f"
+done

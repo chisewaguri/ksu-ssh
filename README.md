@@ -28,7 +28,7 @@ You don't trust me and don't want to use binaries I compiled? No problem! Just h
 
 ## Used Packages and Included Resources
 
-* [OpenSSL](https://www.openssl.org/) (only needed for its libcrypto)
+* [OpenSSL](https://www.openssl.org/)
 * [OpenSSH](https://www.openssh.com/)
 * [Rsync](https://rsync.samba.org/)
 * [Magisk Module Installer](https://github.com/topjohnwu/magisk-module-installer) (used for KSU/APatch module format)

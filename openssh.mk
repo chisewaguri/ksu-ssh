@@ -5,7 +5,7 @@ PACKAGE=openssh
 
 ARCHIVE_NAME:=$(OPENSSH).tar.gz
 #TODO: randomly select mirror?
-DOWNLOAD_URL:=ftp://mirror.hs-esslingen.de/pub/OpenBSD/OpenSSH/portable/$(ARCHIVE_NAME)
+DOWNLOAD_URL:=https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/$(ARCHIVE_NAME)
 
 CFLAGS+=-I$(BUILD_DIR)/openssl/include
 LDFLAGS+=-L$(BUILD_DIR)/openssl/
@@ -40,6 +40,9 @@ $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared $
 	sed -i -e 's:/\* #undef HAVE_MBLEN \*/:#define HAVE_MBLEN 1:'                          \
 	       -e 's:/\* #undef HAVE_ENDGRENT \*/:#define HAVE_ENDGRENT 1:'                    \
 	       -e 's:/\* #undef HAVE_BZERO \*/:#define HAVE_BZERO 1:'                          \
+	       -e 's:/\* #undef HAVE_SHADOW_H \*/:#define HAVE_SHADOW_H 1:'                    \
+	       -e 's:/\* #undef HAVE_GETSPNAM \*/:#define HAVE_GETSPNAM 1:'                    \
+	       -e 's:/\* #undef USE_SHADOW \*/:#define USE_SHADOW 1:'                          \
 	    $(BUILD_DIR)/$(PACKAGE)/config.h
 	$(make-configured-stamp)
 

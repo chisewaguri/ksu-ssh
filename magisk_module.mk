@@ -29,6 +29,8 @@ $(BUILD_DIR)/module/stamp.module-binaries: $(BUILD_DIR)/module/stamp.module-crea
 $(BUILD_DIR)/module/stamp.module-initscript: $(BUILD_DIR)/arm/openssh/stamp.built     \
                                              $(BUILD_DIR)/module/stamp.module-created
 	sed -e 's:#!/bin/sh:#!/system/bin/sh:'         \
+	    -e 's#/usr/bin/##'                         \
+	    -e 's#/usr/sbin/##'                        \
 	    -e 's#=/bin#=/system/bin#'                 \
 	    -e 's#.*PidFile.*##'                       \
 	    -e 's#sbin#bin#'                           \
