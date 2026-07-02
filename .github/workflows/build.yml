@@ -53,9 +53,16 @@ jobs:
           cd build
           make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
 
+      - name: Generate artifact name
+        id: name
+        run: |
+          VERSION=$(sed -n 's/^version=//p' module_data/module.prop)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "artifact=ksu-ssh-$VERSION-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: magisk-ssh
-          path: build/*.zip
+          name: ${{ steps.name.outputs.artifact }}
+          path: build/module/ksu_ssh_standalone/*
           if-no-files-found: error
