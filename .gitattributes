@@ -1,0 +1,31 @@
+# Normalize line endings to LF
+* text eol=lf
+
+# Shell scripts
+*.sh text eol=lf
+
+# Patch files
+*.patch text eol=lf
+
+# Makefiles
+*.mk text eol=lf
+
+# Config files
+*.conf text eol=lf
+*.prop text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+
+# Source code
+*.c text eol=lf
+*.h text eol=lf
+
+# Docs
+*.md text eol=lf
+
+# Binary
+*.gz binary
+*.zip binary
+*.tar binary
+*.png binary
+*.jpg binary
