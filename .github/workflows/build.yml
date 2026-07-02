@@ -10,6 +10,7 @@ on:
 env:
   NDK_VER: r25c
   NDK_PATH: /opt/android-ndk
+  CCACHE_DIR: /tmp/ccache
 
 jobs:
   build:
@@ -21,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make wget python3 p7zip-full
+          sudo apt-get install -y make wget python3 p7zip-full ccache
 
       - name: Cache source archives
         uses: actions/cache@v4
@@ -44,6 +45,26 @@ jobs:
           mv /opt/android-ndk-$NDK_VER $NDK_PATH
           rm android-ndk-$NDK_VER-linux.zip
 
+      - name: Setup ccache
+        run: |
+          NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for suffix in 24 26 28 30 32 34; do
+            ln -sf $(which ccache) /usr/local/bin/armv7a-linux-androideabi${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/aarch64-linux-android${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/i686-linux-android${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/x86_64-linux-android${suffix}-clang
+          done
+          ccache --max-size=2G --zero-stats
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ github.ref_name }}-
+            ccache-
+
       - name: Add NDK to PATH
         run: echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
@@ -52,6 +73,7 @@ jobs:
           mkdir -p build
           cd build
           make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
+          ccache --show-stats
 
       - name: Generate artifact name
         id: name
