@@ -7,31 +7,51 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  NDK_VER: r25c
+  NDK_PATH: /opt/android-ndk
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y make wget python3 p7zip-full
 
-      - name: Setup Android NDK
-        uses: nttld/setup-ndk@v1
-        id: setup-ndk
+      - name: Cache source archives
+        uses: actions/cache@v4
         with:
-          ndk-version: r25c
-          add-to-path: true
+          path: dl
+          key: dl-${{ hashFiles('checksums/*.sha512') }}
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NDK_PATH }}
+          key: ndk-${{ env.NDK_VER }}
+
+      - name: Setup Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VER-linux.zip
+          unzip -q android-ndk-$NDK_VER-linux.zip -d /opt
+          mv /opt/android-ndk-$NDK_VER $NDK_PATH
+          rm android-ndk-$NDK_VER-linux.zip
+
+      - name: Add NDK to PATH
+        run: echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
 
       - name: Build
         run: |
-          mkdir build
+          mkdir -p build
           cd build
-          make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}
+          make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
