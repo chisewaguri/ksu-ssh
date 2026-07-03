@@ -26,7 +26,11 @@ The sshd configuration file in `/data/ssh/sshd_config` can be edited as well, bu
 
 ### Password Authentication
 
-Password authentication for SSH can be enabled with root.
+Password authentication is supported via MD5-crypt and SHA-512-crypt hashes.
+
+> **Note:** Root password login is disabled by default in sshd_config.
+> To enable it, edit `/data/ssh/sshd_config` and set `PermitRootLogin yes`,
+> then restart sshd.
 To set a password for the `root` or `shell` user, run the following as root on
 the device (for example, via terminal emulator or adb shell):
 
@@ -39,7 +43,7 @@ or
 You will be prompted for a password. After setting the password, standard SSH
 password authentication will be available on the next login attempt.
 
-Passwords are stored as SHA-512 crypt hashes in `/data/ssh/etc/shadow`. If you
+Passwords are stored as SHA-512 crypt ($6$) or MD5 ($1$) hashes in `/data/ssh/etc/shadow`. If you
 reinstall the module, you will need to set passwords again.
 
 To disable password authentication, change `/data/ssh/sshd_config` and set
@@ -82,7 +86,7 @@ The other repositories are dead-ends for different reasons.
 
 ###### 2026-07-02, v0.27
 
-- Add password authentication support (SHA-512 crypt)
+- Add password authentication support (MD5 and SHA-512 crypt)
 - Implement getspnam() with /data/ssh/etc/shadow backend
 - Add passwd utility for on-device password management
 

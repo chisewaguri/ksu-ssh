@@ -70,6 +70,7 @@ jobs:
 
       - name: Build
         run: |
+          set -euo pipefail
           mkdir -p build
           cd build
           make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
