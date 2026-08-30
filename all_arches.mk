@@ -42,4 +42,4 @@ $(eval $(call single-arch,x86_64,x86_64,x86-64,x86_64-linux-android,x86_64))
 
 #reset paths
 BUILD_DIR:=$(BUILD_DIR_ROOT)
-$(eval $(call submk,magisk_module.mk))
+$(eval $(call submk,module.mk))
