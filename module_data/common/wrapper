@@ -1,10 +1,11 @@
 #!/system/bin/sh
 
-bindir="$(dirname "$(realpath "$0")")"
-execname="$(basename "$0")"
+bindir=$(dirname "$(realpath "$0")")
+execname=$(basename "$0")
 
-if [ "$USER" == "root" -o "$(whoami 2>/dev/null)" == "root" ]; then
-  exec env LD_LIBRARY_PATH=/system/usr/lib "$bindir/$execname" "$@"
-else
-  echo "$execname: need root permissions"
+if [ "$(id -u)" -ne 0 ]; then
+	echo "$execname: root permission required" >&2
+	exit 1
 fi
+
+exec env LD_LIBRARY_PATH=/data/adb/ssh/usr/lib "$bindir/$execname" "$@"

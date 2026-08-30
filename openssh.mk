@@ -32,10 +32,10 @@ $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared $
 	  CPPFLAGS="$(CFLAGS) -DHAVE_ATTRIBUTE__SENTINEL__=1 -DHAVE__RES_EXTERN=1"             \
 	  --disable-utmpx --disable-utmp --disable-wtmp --disable-wtmpx                        \
 	  --sysconfdir=/data/ssh --with-pid-dir=/data/ssh                                      \
-	  --libexecdir=/system/usr/libexec/ssh-core                                            \
+	  --libexecdir=/data/adb/ssh/usr/libexec/ssh-core                                      \
 	  --with-maildir=/var/mail                                                             \
-	  --with-default-path="/system/bin:/system/xbin:/system/sbin:/magisk/ssh/usr/bin"      \
-	  --with-superuser-path="/system/bin:/system/xbin:/system/sbin:/magisk/ssh/usr/bin"    \
+	  --with-default-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/data/adb/ksu/bin:/data/adb/ap/bin"      \
+	  --with-superuser-path="/system/bin:/system/xbin:/system/sbin:/data/adb/ssh/bin:/data/adb/ksu/bin:/data/adb/ap/bin"   \
 	  --with-privsep-user=root --with-privsep-path=/
 	sed -i -e 's:/\* #undef HAVE_MBLEN \*/:#define HAVE_MBLEN 1:'                          \
 	       -e 's:/\* #undef HAVE_ENDGRENT \*/:#define HAVE_ENDGRENT 1:'                    \
