@@ -1,3 +1,22 @@
-if ! test -e /data/ssh/KEEP_ON_UNINSTALL ; then
-    rm -rf /data/ssh
+test -e /data/ssh/KEEP_ON_UNINSTALL || rm -rf /data/ssh
+rm -rf /data/adb/ssh
+
+if [ "$KSU" = true ]; then
+    BINDIR=/data/adb/ksu/bin
+elif [ "$APATCH" = true ]; then
+    BINDIR=/data/adb/ap/bin
+else
+    exit 0
 fi
+
+for f in scp sftp sftp-server ssh ssh-keygen sshd sshd-session sshd-auth rsync openssl passwd; do
+    if [ "$f" = passwd ]; then
+        target=/data/adb/ssh/bin/passwd
+    else
+        target=/data/adb/ssh/usr/libexec/ssh-core/wrapper
+    fi
+    link="$BINDIR/$f"
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
+        rm -f "$link"
+    fi
+done

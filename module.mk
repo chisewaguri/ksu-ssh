@@ -1,6 +1,6 @@
 $(eval $(call start_package)) # not really a package, but we may reset stuff just in case
 
-MAGISK_INSTALLER_VERSION?=v24.1
+MODULE_INSTALLER_VERSION?=v24.1
 
 .PHONY: module
 module: $(BUILD_DIR)/ksu_ssh-$(VERSION).zip
@@ -29,6 +29,8 @@ $(BUILD_DIR)/module/stamp.module-binaries: $(BUILD_DIR)/module/stamp.module-crea
 $(BUILD_DIR)/module/stamp.module-initscript: $(BUILD_DIR)/arm/openssh/stamp.built     \
                                              $(BUILD_DIR)/module/stamp.module-created
 	sed -e 's:#!/bin/sh:#!/system/bin/sh:'         \
+	    -e 's#/usr/bin/##'                         \
+	    -e 's#/usr/sbin/##'                        \
 	    -e 's#=/bin#=/system/bin#'                 \
 	    -e 's#.*PidFile.*##'                       \
 	    -e 's#sbin#bin#'                           \
@@ -43,20 +45,20 @@ $(BUILD_DIR)/module/stamp.module: $(BUILD_DIR)/module/stamp.module-staticdata \
                                   $(BUILD_DIR)/module/stamp.module-initscript
 	touch $(BUILD_DIR)/module/stamp.module
 
-$(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh: $(ARCHIVE_DIR)/stamp.created
-	wget -O "$(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh" \
+$(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh: $(ARCHIVE_DIR)/stamp.created
+	wget -O "$(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh" \
 	     --no-use-server-timestamps                                          \
-	     "https://raw.githubusercontent.com/topjohnwu/Magisk/$(MAGISK_INSTALLER_VERSION)/scripts/module_installer.sh"
+	     "https://raw.githubusercontent.com/topjohnwu/Magisk/$(MODULE_INSTALLER_VERSION)/scripts/module_installer.sh"
 	cd "$(ARCHIVE_DIR)";                                                                         \
-	sha512sum -c $(ROOT_DIR)/checksums/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh.sha512 || \
-	(mv "$(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh"                         \
-	    "$(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh.invalid_checksum";       \
+	sha512sum -c $(ROOT_DIR)/checksums/magisk_installer-$(MODULE_INSTALLER_VERSION).sh.sha512 || \
+	(mv "$(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh"                         \
+	    "$(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh.invalid_checksum";       \
 	 false)
 
 $(BUILD_DIR)/module/stamp.module-standalone: $(BUILD_DIR)/module/stamp.module \
-                                             $(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh
+                                             $(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh
 	cp -r $(BUILD_DIR)/module/ksu_ssh/. $(BUILD_DIR)/module/ksu_ssh_standalone
-	cp "$(ARCHIVE_DIR)/magisk_installer-$(MAGISK_INSTALLER_VERSION).sh" \
+	cp "$(ARCHIVE_DIR)/magisk_installer-$(MODULE_INSTALLER_VERSION).sh" \
 	   "$(BUILD_DIR)/module/ksu_ssh_standalone/META-INF/com/google/android/update-binary"
 	touch $(BUILD_DIR)/module/stamp.module-standalone
 
