@@ -5,7 +5,7 @@ PACKAGE=openssh
 
 ARCHIVE_NAME:=$(OPENSSH).tar.gz
 #TODO: randomly select mirror?
-DOWNLOAD_URL:=ftp://mirror.hs-esslingen.de/pub/OpenBSD/OpenSSH/portable/$(ARCHIVE_NAME)
+DOWNLOAD_URL:=https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/$(ARCHIVE_NAME)
 
 CFLAGS+=-I$(BUILD_DIR)/openssl/include
 LDFLAGS+=-L$(BUILD_DIR)/openssl/
@@ -24,8 +24,8 @@ PACKAGE_WANT_PREPARE=true
 define pkg-targets
 $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared $(call depend-built,openssl)
 	mkdir -p $(BUILD_DIR)/$(PACKAGE)
-	cd "$(BUILD_DIR)/$(PACKAGE)";                                                          \
-	PATH=$(EXTRA_PATH):$(PATH) $(SRC_DIR)/$(PACKAGE)/$(OPENSSH)/configure \
+	cd "$(BUILD_DIR)/$(PACKAGE)" &&                                                          \
+	PATH=$(EXTRA_PATH):$(PATH) LIBS=-lcrypto $(SRC_DIR)/$(PACKAGE)/$(OPENSSH)/configure \
 	  --build x86_64-pc-linux-gnu --host $(CROSS)                                          \
 	  LD="$(LD)" CC="$(CC)"                                                                \
 	  CFLAGS="$(CFLAGS)" LDFLAGS="$(LDFLAGS)"                                              \
@@ -40,14 +40,22 @@ $(BUILD_DIR)/$(PACKAGE)/stamp.configured: $(SRC_DIR)/$(PACKAGE)/stamp.prepared $
 	sed -i -e 's:/\* #undef HAVE_MBLEN \*/:#define HAVE_MBLEN 1:'                          \
 	       -e 's:/\* #undef HAVE_ENDGRENT \*/:#define HAVE_ENDGRENT 1:'                    \
 	       -e 's:/\* #undef HAVE_BZERO \*/:#define HAVE_BZERO 1:'                          \
+	       -e 's:/\* #undef HAVE_SHADOW_H \*/:#define HAVE_SHADOW_H 1:'                    \
+	       -e 's:/\* #undef HAVE_GETSPNAM \*/:#define HAVE_GETSPNAM 1:'                    \
+	       -e 's:/\* #undef USE_SHADOW \*/:#define USE_SHADOW 1:'                          \
+	       -e 's:/\* #undef HAVE_CRYPT \*/:#define HAVE_CRYPT 1:'                          \
 	    $(BUILD_DIR)/$(PACKAGE)/config.h
 	$(make-configured-stamp)
 
 
 ifneq ($(IS_SRC_$(PACKAGE)_TARGET_PREPARED),true)
 IS_SRC_$(PACKAGE)_TARGET_PREPARED:=true
-$(SRC_DIR)/$(PACKAGE)/stamp.prepared: $(SRC_DIR)/$(PACKAGE)/stamp.unpacked
-	cd "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)"; patch -p1 < "$(ROOT_DIR)/patches/$(OPENSSH).patch"
+$(SRC_DIR)/$(PACKAGE)/stamp.prepared: $(SRC_DIR)/$(PACKAGE)/stamp.unpacked \
+		$(ROOT_DIR)/overlay/openssh/android-tweaks.c \
+		$(ROOT_DIR)/overlay/openssh/android-tweaks.h
+	cd "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)" && patch -p1 < "$(ROOT_DIR)/patches/$(OPENSSH).patch"
+	cd "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)" && cp "$(ROOT_DIR)/overlay/openssh/android-tweaks.c" "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)/"
+	cd "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)" && cp "$(ROOT_DIR)/overlay/openssh/android-tweaks.h" "$(SRC_DIR)/$(PACKAGE)/$(OPENSSH)/"
 	$(make-prepared-stamp)
 endif
 
