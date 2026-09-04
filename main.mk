@@ -33,7 +33,10 @@ copy$(PHONY_TARGET_PREFIX): copy$(PHONY_TARGET_PREFIX)_openssl copy$(PHONY_TARGE
 .PHONY: all$(PHONY_TARGET_PREFIX)
 all$(PHONY_TARGET_PREFIX): build$(PHONY_TARGET_PREFIX)_openssl build$(PHONY_TARGET_PREFIX)_openssh build$(PHONY_TARGET_PREFIX)_rsync
 
-INSTALLED_FILES$(PHONY_TARGET_PREFIX):=$(openssl_INSTALLED_FILES) $(openssh_INSTALLED_FILES) $(rsync_INSTALLED_FILES)
+INSTALLED_FILES$(PHONY_TARGET_PREFIX):=$(openssl_INSTALLED_FILES) $(openssh_INSTALLED_FILES) $(rsync_INSTALLED_FILES) $(BUILD_DIR)/usr/bin/sshd-private-devpts
+$(BUILD_DIR)/usr/bin/sshd-private-devpts: $(ROOT_DIR)/native/sshd-private-devpts.c
+	mkdir -p "$(BUILD_DIR)/usr/bin"
+	$(CC) $(CFLAGS) $(LDFLAGS) -Wall -Wextra -Werror -o "$$@" "$$<"
 endef
 
 
