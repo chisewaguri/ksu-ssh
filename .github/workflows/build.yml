@@ -71,10 +71,23 @@ jobs:
       - name: Build
         run: |
           set -euo pipefail
+          sh tests/test-webui-controller.sh
+          node tests/test-webui-bridge.mjs
           mkdir -p build
           cd build
           make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
           ccache --show-stats
+
+      - name: Check module contents
+        run: |
+          set -euo pipefail
+          MODULE=build/module/ksu_ssh_standalone
+          test -s "$MODULE/sepolicy.rule"
+          test -s "$MODULE/common/ksu-ssh-webui"
+          test -s "$MODULE/webroot/index.html"
+          test -s "$MODULE/webroot/bridge.js"
+          test -s "$MODULE/webroot/app.js"
+          test -s "$MODULE/webroot/style.css"
 
       - name: Generate artifact name
         id: name
@@ -87,5 +100,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ steps.name.outputs.artifact }}
-          path: build/module/ksu_ssh_standalone/*
+          path: build/ksu_ssh_*.zip
           if-no-files-found: error

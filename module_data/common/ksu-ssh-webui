@@ -1,0 +1,345 @@
+#!/system/bin/sh
+set -eu
+
+# Stock Android shells do not provide every utility used by the controller.
+if [ "${SSH_BUSYBOX_READY:-0}" != 1 ]; then
+	for busybox in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox; do
+		[ -x "$busybox" ] || continue
+		export ASH_STANDALONE=1 SSH_BUSYBOX_READY=1
+		exec "$busybox" sh "$0" "$@"
+	done
+fi
+
+DATA_DIR=${SSH_DATA_DIR:-/data/ssh}
+CORE_DIR=${SSH_CORE_DIR:-/data/adb/ssh/usr/libexec/ssh-core}
+MODULE_DIR=${SSH_MODULE_DIR:-$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)}
+SSHD_BIN=${SSH_SSHD_BIN:-$CORE_DIR/sshd}
+KEYGEN_BIN=${SSH_KEYGEN_BIN:-$CORE_DIR/ssh-keygen}
+OPENSSL_BIN=${SSH_OPENSSL_BIN:-$CORE_DIR/openssl}
+INIT_SCRIPT=${SSH_INIT_SCRIPT:-$MODULE_DIR/opensshd.init}
+ROOT_UID=${SSH_ROOT_UID:-0}
+ROOT_GID=${SSH_ROOT_GID:-0}
+SHELL_UID=${SSH_SHELL_UID:-2000}
+SHELL_GID=${SSH_SHELL_GID:-2000}
+CONFIG=$DATA_DIR/sshd_config
+PID_FILE=${SSH_PID_FILE:-}
+LOG_FILE=$DATA_DIR/service.log
+
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/data/adb/ssh/usr/lib}
+umask 077
+
+fail() {
+	printf '%s\n' "$*" >&2
+	exit 1
+}
+
+require_user() {
+	case "$1" in
+		root|shell) ;;
+		*) fail "invalid SSH user" ;;
+	esac
+}
+
+key_file() {
+	require_user "$1"
+	printf '%s/%s/.ssh/authorized_keys\n' "$DATA_DIR" "$1"
+}
+
+fix_key_permissions() {
+	perm_file=$1
+	perm_user=$2
+	chmod 600 "$perm_file"
+	if [ "$perm_user" = root ]; then
+		chown "$ROOT_UID:$ROOT_GID" "$perm_file"
+	else
+		chown "$SHELL_UID:$SHELL_GID" "$perm_file"
+	fi
+}
+
+decode_to() {
+	[ -n "${1:-}" ] || fail "missing encoded payload"
+	printf '%s' "$1" | "$OPENSSL_BIN" enc -d -base64 -A > "$2" ||
+		fail "invalid encoded payload"
+}
+
+encode_file() {
+	"$OPENSSL_BIN" enc -base64 -A -in "$1"
+}
+
+validate_key_file() {
+	validation_file=$1
+	[ -s "$validation_file" ] || fail "public key is empty"
+	awk 'END { if (NR != 1 || NF == 0) exit 1 }' "$validation_file" ||
+		fail "enter exactly one public key"
+	validation_key=$(awk 'NR == 1 { sub(/\r$/, ""); print; exit }' "$validation_file")
+	printf '%s' "$validation_key" > "$validation_file"
+	"$KEYGEN_BIN" -lf "$validation_file" >/dev/null 2>&1 || fail "invalid public key"
+}
+
+config_value() {
+	name=$1
+	fallback=$2
+	awk -v wanted="$name" -v fallback="$fallback" '
+		BEGIN { value = fallback }
+		tolower($1) == "match" { exit }
+		tolower($1) == tolower(wanted) { print $2; found = 1; exit }
+		END { if (!found) print value }
+	' "$CONFIG"
+}
+
+fix_config_permissions() {
+	chmod 600 "$1"
+	chown "$ROOT_UID:$ROOT_GID" "$1"
+}
+
+validate_config() {
+	"$SSHD_BIN" -t -f "$1"
+}
+
+install_config() {
+	candidate=$1
+	validate_config "$candidate" || fail "invalid sshd_config"
+	backup=$CONFIG.bak.tmp.$$
+	cp "$CONFIG" "$backup"
+	fix_config_permissions "$backup"
+	mv -f "$backup" "$CONFIG.bak"
+	fix_config_permissions "$candidate"
+	mv -f "$candidate" "$CONFIG"
+}
+
+set_directive() {
+	name=$1
+	value=$2
+	candidate=$CONFIG.tmp.$$
+	trap 'rm -f "$candidate"' EXIT HUP INT TERM
+	awk -v name="$name" -v value="$value" '
+		BEGIN { done = 0; matched = 0 }
+		tolower($1) == "match" {
+			if (!done) { print name " " value; done = 1 }
+			matched = 1
+		}
+		!matched && tolower($1) == tolower(name) {
+			if (!done) { print name " " value; done = 1 }
+			next
+		}
+		{ print }
+		END { if (!done) print name " " value }
+	' "$CONFIG" > "$candidate"
+	install_config "$candidate"
+	trap - EXIT HUP INT TERM
+}
+
+keys_list() {
+	file=$(key_file "$1")
+	[ -f "$file" ] || exit 0
+	while IFS= read -r line || [ -n "$line" ]; do
+		[ -n "$line" ] || continue
+		candidate=$file.list.$$
+		printf '%s\n' "$line" > "$candidate"
+		info=$($KEYGEN_BIN -lf "$candidate" 2>/dev/null || true)
+		rm -f "$candidate"
+		[ -n "$info" ] || continue
+		encoded=$(printf '%s' "$line" | "$OPENSSL_BIN" enc -base64 -A)
+		encoded_info=$(printf '%s' "$info" | "$OPENSSL_BIN" enc -base64 -A)
+		printf 'key\t%s\t%s\n' "$encoded" "$encoded_info"
+	done < "$file"
+}
+
+keys_add() {
+	add_user=$1
+	add_file=$(key_file "$add_user")
+	mkdir -p "$(dirname "$add_file")"
+	touch "$add_file"
+	fix_key_permissions "$add_file" "$add_user"
+	add_candidate=$add_file.add.$$
+	trap 'rm -f "$add_candidate" "$add_file.tmp.$$"' EXIT HUP INT TERM
+	decode_to "$2" "$add_candidate"
+	validate_key_file "$add_candidate"
+	add_key=$(cat "$add_candidate")
+	set -- $add_key
+	add_material=$2
+	if awk '{ print $2 }' "$add_file" | grep -Fqx "$add_material"; then
+		fail "public key already exists"
+	fi
+	add_output=$add_file.tmp.$$
+	awk '{ print }' "$add_file" > "$add_output"
+	cat "$add_candidate" >> "$add_output"
+	printf '\n' >> "$add_output"
+	rm -f "$add_candidate"
+	fix_key_permissions "$add_output" "$add_user"
+	mv -f "$add_output" "$add_file"
+	trap - EXIT HUP INT TERM
+}
+
+keys_delete() {
+	delete_user=$1
+	delete_file=$(key_file "$delete_user")
+	[ -f "$delete_file" ] || fail "authorized_keys does not exist"
+	delete_candidate=$delete_file.delete.$$
+	trap 'rm -f "$delete_candidate" "$delete_file.tmp.$$"' EXIT HUP INT TERM
+	decode_to "$2" "$delete_candidate"
+	validate_key_file "$delete_candidate"
+	delete_key=$(cat "$delete_candidate")
+	grep -Fqx -- "$delete_key" "$delete_file" || {
+		rm -f "$delete_candidate"
+		fail "public key was not found"
+	}
+	delete_output=$delete_file.tmp.$$
+	grep -Fvx -- "$delete_key" "$delete_file" > "$delete_output" || [ $? -eq 1 ]
+	rm -f "$delete_candidate"
+	fix_key_permissions "$delete_output" "$delete_user"
+	mv -f "$delete_output" "$delete_file"
+	trap - EXIT HUP INT TERM
+}
+
+settings_get() {
+	[ -e "$DATA_DIR/no-autostart" ] && autostart=0 || autostart=1
+	password=$(config_value PasswordAuthentication yes)
+	root_login=$(config_value PermitRootLogin prohibit-password)
+	case "$password" in yes) password=1 ;; *) password=0 ;; esac
+	case "$root_login" in
+		no) root_login=disabled ;;
+		yes) root_login=password ;;
+		*) root_login=keys ;;
+	esac
+	printf 'autostart\t%s\n' "$autostart"
+	printf 'port\t%s\n' "$(config_value Port 22)"
+	printf 'password-auth\t%s\n' "$password"
+	printf 'root-login\t%s\n' "$root_login"
+}
+
+settings_set() {
+	name=${1:-}
+	value=${2:-}
+	case "$name" in
+		autostart)
+			case "$value" in
+				1) rm -f "$DATA_DIR/no-autostart" ;;
+				0) touch "$DATA_DIR/no-autostart" ;;
+				*) fail "autostart must be 0 or 1" ;;
+			esac
+			;;
+		port)
+			case "$value" in *[!0-9]*|'') fail "port must be a number" ;; esac
+			[ "$value" -ge 1 ] && [ "$value" -le 65535 ] ||
+				fail "port must be between 1 and 65535"
+			set_directive Port "$value"
+			;;
+		password-auth)
+			case "$value" in 1) value=yes ;; 0) value=no ;; *) fail "invalid value" ;; esac
+			set_directive PasswordAuthentication "$value"
+			;;
+		root-login)
+			case "$value" in
+				disabled) value=no ;;
+				keys) value=prohibit-password ;;
+				password) value=yes ;;
+				*) fail "invalid root login mode" ;;
+			esac
+			set_directive PermitRootLogin "$value"
+			;;
+		*) fail "unknown setting" ;;
+	esac
+}
+
+service_action() {
+	case "$1" in
+		start|stop|restart) ;;
+		*) fail "invalid service action" ;;
+	esac
+	# Keep only the previous 100 lines before recording this operation.
+	touch "$LOG_FILE"
+	tail -n 100 "$LOG_FILE" > "$LOG_FILE.tmp.$$"
+	mv -f "$LOG_FILE.tmp.$$" "$LOG_FILE"
+	printf '\n%s %s\n' "$(date)" "$1" >> "$LOG_FILE"
+	if [ "$1" != start ] && service_running; then
+		sh "$INIT_SCRIPT" stop >> "$LOG_FILE" 2>&1 || fail "Could not stop SSH. Check the service log."
+		attempt=0
+		while service_running; do
+			[ "$attempt" -lt 5 ] || fail "SSH is still stopping. Refresh its status."
+			sleep 1
+			attempt=$((attempt + 1))
+		done
+	fi
+	if [ "$1" != stop ] && ! service_running; then
+		sh "$INIT_SCRIPT" start >> "$LOG_FILE" 2>&1 || {
+			tail -n 10 "$LOG_FILE" >&2
+			exit 1
+		}
+		attempt=0
+		while ! service_running; do
+			[ "$attempt" -lt 5 ] || fail "SSH did not start. Check the service log."
+			sleep 1
+			attempt=$((attempt + 1))
+		done
+	fi
+}
+
+service_running() {
+	running_pid_file=${PID_FILE:-$(config_value PidFile "$DATA_DIR/sshd.pid")}
+	[ -r "$running_pid_file" ] || return 1
+	running_pid=$(cat "$running_pid_file" 2>/dev/null) || return 1
+	case "$running_pid" in
+		''|*[!0-9]*) return 1 ;;
+	esac
+	[ "$running_pid" -gt 1 ] 2>/dev/null || return 1
+	kill -0 "$running_pid" 2>/dev/null
+}
+
+command=${1:-}
+case "$command" in
+	log)
+		[ ! -f "$LOG_FILE" ] || tail -n 100 "$LOG_FILE"
+		;;
+	addresses)
+		ip -o -4 addr show scope global | awk '{ sub(/\/.*/, "", $4); print $4 }'
+		;;
+	state)
+		if service_running; then state=running; else state=stopped; fi
+		printf 'state\t%s\nport\t%s\n' "$state" "$(config_value Port 22)"
+		;;
+	service)
+		[ "$#" -eq 2 ] || fail "usage: service start|stop|restart"
+		service_action "$2"
+		;;
+	keys)
+		[ "$#" -ge 3 ] || fail "usage: keys list|add|delete root|shell"
+		action=$2
+		user=$3
+		require_user "$user"
+		case "$action" in
+			list) [ "$#" -eq 3 ] || fail "unexpected argument"; keys_list "$user" ;;
+			add) [ "$#" -eq 4 ] || fail "missing public key"; keys_add "$user" "$4" ;;
+			delete) [ "$#" -eq 4 ] || fail "missing public key"; keys_delete "$user" "$4" ;;
+			*) fail "invalid keys action" ;;
+		esac
+		;;
+	settings)
+		case "${2:-}" in
+			get) [ "$#" -eq 2 ] || fail "unexpected argument"; settings_get ;;
+			set) [ "$#" -eq 4 ] || fail "usage: settings set name value"; settings_set "$3" "$4" ;;
+			*) fail "invalid settings action" ;;
+		esac
+		;;
+	config)
+		case "${2:-}" in
+			get)
+				[ "$#" -eq 2 ] || fail "unexpected argument"
+				printf 'config\t'
+				encode_file "$CONFIG"
+				printf '\n'
+				;;
+			save)
+				[ "$#" -eq 3 ] || fail "missing config"
+				candidate=$CONFIG.tmp.$$
+				trap 'rm -f "$candidate"' EXIT HUP INT TERM
+				decode_to "$3" "$candidate"
+				[ -s "$candidate" ] || fail "sshd_config cannot be empty"
+				install_config "$candidate"
+				trap - EXIT HUP INT TERM
+				;;
+			*) fail "invalid config action" ;;
+		esac
+	;;
+	*) fail "unknown command" ;;
+esac

@@ -32,7 +32,6 @@ $(BUILD_DIR)/module/stamp.module-initscript: $(BUILD_DIR)/arm/openssh/stamp.buil
 	    -e 's#/usr/bin/##'                         \
 	    -e 's#/usr/sbin/##'                        \
 	    -e 's#=/bin#=/system/bin#'                 \
-	    -e 's#.*PidFile.*##'                       \
 	    -e 's#sbin#bin#'                           \
 	    -e 's#^prefix=.*#prefix=/system#' \
 	    -e 's#@COMMENT_OUT_RSA1@.*##'              \

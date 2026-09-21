@@ -1,0 +1,2 @@
+# Interactive SSH terminals need these permissions on strict OEM policies.
+allow su devpts chr_file { open read write getattr ioctl }

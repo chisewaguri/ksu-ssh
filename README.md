@@ -8,6 +8,39 @@ Main changes from upstream:
   - Mountless: binaries in `/data/adb/ssh`, no system partition mounts
   - Password authentication
   - Requires KernelSU or APatch (Magisk not supported)
+  - Miuix-style WebUI for service controls, root/shell keys, settings and configuration
+  - Scoped SELinux permission for interactive root SSH terminals
+
+## WebUI
+
+Open the module's WebUI from KernelSU or APatch. Start or stop SSH, copy a connection
+command, manage keys for root and shell, or change the port and login settings.
+Configuration is validated before saving, with the previous version kept in
+`/data/ssh/sshd_config.bak`. Restart SSH to apply configuration changes.
+The Advanced page shows startup and stop output. Refresh retries failed connections
+to the manager's root command bridge.
+Connection commands have a copy button and a root/shell account selector. You can
+import a public `.pub` key, apply saved settings with one restart, and switch tabs
+without losing configuration edits. Discard edits explicitly when you no longer need them.
+
+The terminal permission rule follows [jtnqr/ssh-ksu](https://github.com/jtnqr/ssh-ksu).
+The WebUI uses the `ksu.exec` shell-API approach from
+[Patched-MagiskSSH](https://github.com/powerAn2020/Patched-MagiskSSH), with our existing
+Miuix styling and persistent data paths. It needs no network access to load.
+Reboot after installing so the root manager loads `sepolicy.rule`.
+
+Local checks:
+
+```sh
+sh tests/test-webui-controller.sh
+node tests/test-webui-bridge.mjs
+# Optional browser checks, with Playwright and its Chromium browser installed:
+node tests/test-webui-browser.cjs
+```
+
+Browser tests simulate the Android command bridge. Final device checks must include
+opening the WebUI in the manager, starting and restarting SSH, and connecting with
+`ssh -tt -p PORT root@DEVICE` to verify an interactive terminal under enforcing SELinux.
 
 An SSH server for Android devices having KernelSU / APatch
 ========================================================================

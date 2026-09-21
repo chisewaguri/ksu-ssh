@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>KSU SSH</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div>
+        <h1>KSU SSH</h1>
+        <p>Secure shell for your device</p>
+      </div>
+      <div class="header-actions"><span id="service-badge" class="status-badge"><span></span>Checking</span><button id="refresh" class="text-button" type="button">Refresh</button></div>
+    </header>
+
+    <div id="error-panel" class="error-panel" role="alert" hidden><strong>Could not complete the request</strong><p id="error-message"></p><button id="dismiss-error" class="text-button" type="button">Dismiss</button></div>
+    <div id="pending-settings" class="pending-settings" role="status" hidden><div><strong>Settings saved</strong><p id="pending-detail">Restart SSH to apply your changes.</p></div><button id="apply-settings" class="primary" type="button">Restart to apply</button></div>
+    <p id="activity" class="activity" role="status" hidden></p>
+
+    <div id="home-page" class="page-panel active" data-page="home">
+    <section class="service-card" aria-labelledby="service-title">
+      <div>
+        <h2 id="service-title">SSH is checking</h2>
+        <p id="service-detail" class="muted">Reading service state…</p>
+      </div>
+      <div class="service-actions">
+        <button id="service-toggle" class="primary" type="button">Start</button>
+        <button id="service-restart" class="secondary" type="button">Restart</button>
+      </div>
+    </section>
+
+    <section class="group connection" aria-labelledby="connection-heading">
+      <div class="connection-heading"><h2 id="connection-heading">Connect</h2><label class="account-picker">Account<select id="connection-user"><option value="root">Root</option><option value="shell">Shell</option></select></label></div>
+      <p id="connection-help">Run this command on a computer on the same network.</p>
+      <div id="connection-list">Reading network addresses...</div>
+      <button id="setup-keys" class="text-button" type="button">Set up a login key</button>
+    </section>
+
+    <section aria-labelledby="settings-heading">
+      <div class="section-heading"><h2 id="settings-heading">Service settings</h2></div>
+      <div class="group settings">
+        <label class="row">
+          <span><strong>Start on boot</strong><small>Start SSH after the device boots</small></span>
+          <input id="autostart" class="switch" type="checkbox" aria-label="Start on boot">
+        </label>
+        <button id="port-row" class="row row-button" type="button">
+          <span><strong>Port</strong><small>Listening port</small></span><span id="port-value" class="value">22</span>
+        </button>
+      </div>
+    </section>
+
+    <section aria-labelledby="access-heading">
+      <details class="access-options"><summary id="access-heading">Login methods<span>Keys and passwords</span></summary>
+      <div class="group settings">
+        <div class="account-label"><strong>All accounts</strong><span>Authentication</span></div>
+        <label class="row">
+          <span><strong>Password authentication</strong><small>Allow passwords for SSH accounts</small></span>
+          <input id="password-auth" class="switch" type="checkbox" aria-label="Allow password authentication">
+        </label>
+        <div class="account-label"><strong>Root</strong><span>Full device access</span></div>
+        <label class="row">
+          <span><strong>Root login</strong><small>Allow root access, using keys by default</small></span>
+          <input id="root-login" class="switch" type="checkbox" aria-label="Allow root login">
+        </label>
+        <label id="root-password-row" class="row dependent disabled">
+          <span><strong>Password login</strong><small id="root-password-help">Requires shell password login and root key login</small></span>
+          <input id="root-password" class="switch" type="checkbox" aria-label="Allow root password login" disabled>
+        </label>
+      </div>
+      </details>
+      <p id="save-note" class="save-note" aria-live="polite"></p>
+    </section>
+    </div>
+
+    <div id="keys-page" class="page-panel" data-page="keys" hidden>
+    <section class="first-section" aria-labelledby="keys-heading">
+      <div class="section-heading">
+        <div><h2 id="keys-heading">Login keys <span id="key-count" class="count"></span></h2></div>
+        <button id="add-key" class="text-button" type="button">Add key</button>
+      </div>
+      <div class="tabs" role="tablist" aria-label="SSH user">
+        <button id="root-tab" role="tab" aria-selected="true" aria-controls="key-list" type="button">Root</button>
+        <button id="shell-tab" role="tab" aria-selected="false" aria-controls="key-list" tabindex="-1" type="button">Shell</button>
+      </div>
+      <p id="key-account-help" class="terminal-note">Root keys grant full device access.</p>
+      <div id="key-list" class="group key-list" role="tabpanel" aria-labelledby="root-tab" aria-live="polite"></div>
+      <div id="keys-empty" class="group empty-state" hidden><h3>No keys yet</h3><p>Add your computer's public key to sign in without a password.</p><button id="add-first-key" class="primary" type="button">Add your first key</button></div>
+      <details class="key-help"><summary>Where do I find my public key?</summary><p>On your computer, look for a file ending in <code>.pub</code> inside your <code>~/.ssh</code> folder. Copy its contents or import the file here. Keep the private key on your computer.</p></details>
+    </section>
+    </div>
+
+    <div id="advanced-page" class="page-panel" data-page="advanced" hidden>
+    <section class="first-section" aria-labelledby="advanced-heading">
+      <div class="section-heading"><h2 id="advanced-heading">Configuration</h2><span id="config-status" class="count" role="status">Saved</span></div>
+      <div id="advanced" class="group advanced">
+        <div class="advanced-title"><strong>Raw sshd_config</strong><span>Validated before saving</span></div>
+        <div class="editor-wrap">
+          <label for="config-editor">OpenSSH server configuration</label>
+          <textarea id="config-editor" spellcheck="false" autocomplete="off"></textarea>
+          <div class="editor-actions"><button id="discard-config" class="secondary" type="button">Discard edits</button><button id="save-config" class="primary" type="button">Save configuration</button></div>
+        </div>
+      </div>
+      <p class="terminal-note">Create or change passwords from a terminal with <code>passwd root</code> or <code>passwd shell</code>.</p>
+      <div class="section-heading"><h2>Service log</h2><button id="refresh-log" class="text-button" type="button">Refresh log</button></div>
+      <pre id="service-log" class="group service-log">Loading...</pre>
+      <p class="terminal-note">Startup and stop output. SSH session activity is not recorded here.</p>
+    </section>
+    </div>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Main navigation">
+    <button class="nav-item active" data-target="home" aria-current="page" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10H3Z M9 20v-7h6v7"/></svg>Home</button>
+    <button class="nav-item" data-target="keys" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="9" r="5"/><path d="m12 13 8 8m-4-4 3-3m-6 0 3-3"/></svg>Keys</button>
+    <button class="nav-item" data-target="advanced" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16M8 3v6m8 0v6m-6 0v6"/></svg>Advanced</button>
+  </nav>
+
+  <dialog id="key-dialog">
+    <form method="dialog">
+      <h2>Add authorized key</h2>
+      <p>Add a public key for <strong id="key-user">root</strong>. Use the <code>.pub</code> file, never your private key.</p>
+      <button id="import-key" class="secondary" type="button">Import .pub file</button><input id="key-file" type="file" accept=".pub,text/plain" hidden>
+      <label for="key-input">Public key</label>
+      <textarea id="key-input" rows="5" placeholder="ssh-ed25519 AAAA… device-name" spellcheck="false" autocapitalize="off" aria-describedby="key-error" required></textarea>
+      <p id="key-error" class="form-error" aria-live="polite"></p>
+      <div class="dialog-actions"><button value="cancel" class="secondary" formnovalidate>Cancel</button><button id="confirm-key" value="default" class="primary">Add key</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="port-dialog">
+    <form method="dialog">
+      <h2>SSH port</h2>
+      <p>Use a port from 1 to 65535. The default is 22. Restart SSH after saving to use the new port.</p>
+      <label for="port-input">Port number</label>
+      <input id="port-input" type="number" min="1" max="65535" inputmode="numeric" required>
+      <p id="port-error" class="form-error" aria-live="polite"></p>
+      <div class="dialog-actions"><button value="cancel" class="secondary" formnovalidate>Cancel</button><button id="confirm-port" value="default" class="primary">Save</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title" aria-describedby="confirm-detail">
+    <form method="dialog"><h2 id="confirm-title"></h2><p id="confirm-detail"></p><div class="dialog-actions"><button value="cancel" class="secondary" autofocus>Keep it</button><button id="confirm-action" value="confirm" class="danger-button">Remove</button></div></form>
+  </dialog>
+  <script src="bridge.js" defer></script>
+  <script src="app.js" defer></script>
+</body>
+</html>
