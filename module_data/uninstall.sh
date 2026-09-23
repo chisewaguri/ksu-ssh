@@ -10,5 +10,13 @@ else
 fi
 
 for f in scp sftp sftp-server ssh ssh-keygen sshd sshd-session sshd-auth rsync openssl passwd; do
-    rm -f "$BINDIR/$f"
+    if [ "$f" = passwd ]; then
+        target=/data/adb/ssh/bin/passwd
+    else
+        target=/data/adb/ssh/usr/libexec/ssh-core/wrapper
+    fi
+    link="$BINDIR/$f"
+    if [ -L "$link" ] && [ "$(readlink "$link")" = "$target" ]; then
+        rm -f "$link"
+    fi
 done

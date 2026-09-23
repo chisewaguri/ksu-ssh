@@ -102,6 +102,12 @@ key login are both enabled.
 Setting changes do not restart SSH. The new values apply the next time SSH
 starts.
 
+Configuration writes take a lock so concurrent controller commands cannot
+discard each other's settings. The WebUI also queues setting changes. When the
+Advanced editor has no unsaved edits, reopening it loads the current file.
+Before saving a draft, the WebUI checks that the file has not changed since it
+was loaded and asks the user to reload if it has.
+
 ## File updates
 
 The controller updates `authorized_keys` through a temporary file and an atomic
@@ -145,7 +151,12 @@ root:
 ```sh
 sh tests/test-webui-controller.sh
 sh tests/test-webui-static.sh
+sh tests/test-passwd.sh
+sh tests/test-password-crypt.sh
+sh tests/test-uninstall-links.sh
 node tests/test-webui-bridge.mjs
+node tests/test-webui-app.mjs stale
+node tests/test-webui-app.mjs concurrent
 ```
 
 The integration test uses temporary SSH data and stubbed service commands. It

@@ -1,9 +1,10 @@
+/* config.h may rename malloc, so it must precede stdlib.h. */
+#include "config.h"
 #include "android-tweaks.h"
 #include <stdlib.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
-#include "config.h"
 #ifdef WITH_OPENSSL
 #include <openssl/md5.h>
 #include <openssl/sha.h>

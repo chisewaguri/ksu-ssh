@@ -14,6 +14,7 @@ ROOT_GID=${SSH_ROOT_GID:-0}
 SHELL_UID=${SSH_SHELL_UID:-2000}
 SHELL_GID=${SSH_SHELL_GID:-2000}
 CONFIG=$DATA_DIR/sshd_config
+CONFIG_LOCK=$CONFIG.lock
 PID_FILE=${SSH_PID_FILE:-}
 
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/data/adb/ssh/usr/lib}
@@ -87,6 +88,29 @@ validate_config() {
 	"$SSHD_BIN" -t -f "$1"
 }
 
+cleanup_config_write() {
+	[ -z "${candidate:-}" ] || rm -f "$candidate"
+	[ "${config_locked:-0}" -eq 0 ] || rmdir "$CONFIG_LOCK"
+}
+
+lock_config() {
+	attempts=0
+	until mkdir "$CONFIG_LOCK" 2>/dev/null; do
+		attempts=$((attempts + 1))
+		[ "$attempts" -lt 5 ] || fail "SSH configuration is busy"
+		sleep 1
+	done
+	config_locked=1
+	trap 'cleanup_config_write' EXIT
+	trap 'exit 1' HUP INT TERM
+}
+
+unlock_config() {
+	cleanup_config_write
+	config_locked=0
+	trap - EXIT HUP INT TERM
+}
+
 install_config() {
 	candidate=$1
 	validate_config "$candidate" || fail "invalid sshd_config"
@@ -101,8 +125,8 @@ install_config() {
 set_directive() {
 	name=$1
 	value=$2
+	lock_config
 	candidate=$CONFIG.tmp.$$
-	trap 'rm -f "$candidate"' EXIT HUP INT TERM
 	awk -v name="$name" -v value="$value" '
 		BEGIN { done = 0; matched = 0 }
 		tolower($1) == "match" {
@@ -117,7 +141,7 @@ set_directive() {
 		END { if (!done) print name " " value }
 	' "$CONFIG" > "$candidate"
 	install_config "$candidate"
-	trap - EXIT HUP INT TERM
+	unlock_config
 }
 
 keys_list() {
@@ -295,12 +319,12 @@ case "$command" in
 				;;
 			save)
 				[ "$#" -eq 3 ] || fail "missing config"
+				lock_config
 				candidate=$CONFIG.tmp.$$
-				trap 'rm -f "$candidate"' EXIT HUP INT TERM
 				decode_to "$3" "$candidate"
 				[ -s "$candidate" ] || fail "sshd_config cannot be empty"
 				install_config "$candidate"
-				trap - EXIT HUP INT TERM
+				unlock_config
 				;;
 			*) fail "invalid config action" ;;
 		esac

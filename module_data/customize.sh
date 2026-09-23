@@ -1,7 +1,7 @@
 #!/system/bin/sh
 TMPDIR="$MODPATH/tmp"
 
-mkdir -p "$TMPDIR" /data/adb/ssh/bin /data/adb/ssh/usr/libexec/ssh-core
+mkdir -p "$TMPDIR" /data/adb/ssh/bin /data/adb/ssh/usr/lib /data/adb/ssh/usr/libexec/ssh-core
 
 unzip -o "$ZIPFILE" 'common/opensshd.init' -d "$MODPATH/tmp" >&2
 unzip -o "$ZIPFILE" 'common/wrapper' -d "$MODPATH/tmp" >&2
@@ -13,8 +13,8 @@ mv "$TMPDIR/common/opensshd.init" "$MODPATH"
 mv "$TMPDIR/common/wrapper" /data/adb/ssh/usr/libexec/ssh-core
 mv "$TMPDIR/common/passwd" /data/adb/ssh/bin/
 mv "$TMPDIR/common/ksu-ssh-webui" /data/adb/ssh/bin/
-mv "$TMPDIR/arch/$ARCH/lib" /data/adb/ssh/usr
-mv "$TMPDIR/arch/$ARCH/bin"/* /data/adb/ssh/usr/libexec/ssh-core
+mv "$TMPDIR/arch/$ARCH/lib"/* /data/adb/ssh/usr/lib/ || abort "cannot install SSH libraries"
+mv "$TMPDIR/arch/$ARCH/bin"/* /data/adb/ssh/usr/libexec/ssh-core/ || abort "cannot install SSH binaries"
 
 if [ "$KSU" = true ]; then
     BINDIR=/data/adb/ksu/bin

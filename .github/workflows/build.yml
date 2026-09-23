@@ -30,7 +30,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y make wget python3 p7zip-full ccache
+          sudo apt-get install -y make wget python3 p7zip-full ccache libssl-dev
 
       - name: Cache source archives
         uses: actions/cache@v4
@@ -81,7 +81,12 @@ jobs:
           set -euo pipefail
           sh tests/test-webui-controller.sh
           sh tests/test-webui-static.sh
+          sh tests/test-passwd.sh
+          sh tests/test-password-crypt.sh
+          sh tests/test-uninstall-links.sh
           node tests/test-webui-bridge.mjs
+          node tests/test-webui-app.mjs stale
+          node tests/test-webui-app.mjs concurrent
           mkdir -p build
           cd build
           make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH

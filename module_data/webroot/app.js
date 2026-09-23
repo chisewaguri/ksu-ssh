@@ -2,8 +2,15 @@ import { spawn } from "./vendor/kernelsu.js";
 
 const CONTROLLER = "/data/adb/ssh/bin/ksu-ssh-webui";
 const $ = (selector) => document.querySelector(selector);
-const state = { running: false, user: "root", settings: {}, configLoaded: false };
+const state = { running: false, user: "root", settings: {}, configLoaded: false, configBase: "" };
 let toastTimer;
+let configWrites = Promise.resolve();
+
+function queueConfigWrite(operation) {
+  const pending = configWrites.then(operation);
+  configWrites = pending.catch(() => {});
+  return pending;
+}
 
 async function showPage(name) {
   document.querySelectorAll(".page-panel").forEach((panel) => {
@@ -18,11 +25,16 @@ async function showPage(name) {
     else item.removeAttribute("aria-current");
   });
   window.scrollTo({ top: 0, behavior: "auto" });
-  if (name === "advanced" && !state.configLoaded) {
+  if (name === "advanced") {
     try {
+      await configWrites;
       const [, encoded] = records(await run(["config", "get"]))[0];
-      $("#config-editor").value = decode(encoded);
-      state.configLoaded = true;
+      const editor = $("#config-editor");
+      if (!state.configLoaded || editor.value === state.configBase) {
+        editor.value = decode(encoded);
+        state.configBase = editor.value;
+        state.configLoaded = true;
+      }
     } catch (error) { notify(errorMessage(error)); }
   }
 }
@@ -209,17 +221,19 @@ function saved() {
   setTimeout(() => { note.textContent = ""; }, 5000);
 }
 
-async function setSetting(name, value) {
-  const previous = { ...state.settings };
-  try {
-    await run(["settings", "set", name, value]);
-    await loadSettings();
-    saved();
-  } catch (error) {
-    state.settings = previous;
-    renderSettings();
-    notify(errorMessage(error));
-  }
+function setSetting(name, value) {
+  return queueConfigWrite(async () => {
+    const previous = { ...state.settings };
+    try {
+      await run(["settings", "set", name, value]);
+      await loadSettings();
+      saved();
+    } catch (error) {
+      state.settings = previous;
+      renderSettings();
+      notify(errorMessage(error));
+    }
+  });
 }
 
 $("#service-toggle").addEventListener("click", () => serviceAction(state.running ? "stop" : "start"));
@@ -265,7 +279,19 @@ document.querySelectorAll(".nav-item").forEach((item) => {
 $("#save-config").addEventListener("click", async () => {
   const button = $("#save-config");
   button.disabled = true;
-  try { await run(["config", "save", encode($("#config-editor").value)]); notify("Configuration saved"); saved(); }
+  try {
+    await queueConfigWrite(async () => {
+      const [, encoded] = records(await run(["config", "get"]))[0];
+      if (decode(encoded) !== state.configBase) {
+        throw new Error("Configuration changed. Reload the WebUI before saving your edits.");
+      }
+      const value = $("#config-editor").value;
+      await run(["config", "save", encode(value)]);
+      state.configBase = value;
+      notify("Configuration saved");
+      saved();
+    });
+  }
   catch (error) { notify(errorMessage(error)); }
   finally { button.disabled = false; }
 });

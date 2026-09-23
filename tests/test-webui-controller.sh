@@ -29,6 +29,10 @@ while [ "$#" -gt 0 ]; do
     shift
 done
 grep -q '^InvalidDirective ' "$config" && exit 1
+[ -z "${SSH_TEST_VALIDATE_MARKER:-}" ] || {
+    touch "$SSH_TEST_VALIDATE_MARKER"
+    sleep 1
+}
 exit 0
 EOF
 
@@ -57,6 +61,7 @@ run() {
     SSH_PID_FILE=$data/sshd.pid \
     SSH_ROOT_UID=$(id -u) SSH_ROOT_GID=$(id -g) \
     SSH_SHELL_UID=$(id -u) SSH_SHELL_GID=$(id -g) \
+    SSH_TEST_VALIDATE_MARKER=${SSH_TEST_VALIDATE_MARKER:-} \
     sh "$controller" "$@"
 }
 
@@ -174,5 +179,23 @@ if grep -q '^init restart$' "$log"; then
     echo "restart bypassed private devpts" >&2
     exit 1
 fi
+
+run settings set root-login keys
+marker=$tmp/validation-started
+SSH_TEST_VALIDATE_MARKER=$marker run settings set password-auth 0 > "$tmp/first-write.log" &
+first_write=$!
+attempts=0
+while [ ! -f "$marker" ]; do
+    [ "$attempts" -lt 500 ] || { echo 'validation did not start' >&2; exit 1; }
+    attempts=$((attempts + 1))
+    sleep 0.01
+done
+run settings set root-login disabled
+wait "$first_write"
+grep -q '^PasswordAuthentication no$' "$data/sshd_config"
+grep -q '^PermitRootLogin no$' "$data/sshd_config" || {
+    echo 'concurrent settings update was lost' >&2
+    exit 1
+}
 
 printf 'webui controller tests passed\n'
