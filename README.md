@@ -15,6 +15,8 @@ contributors.
 - Includes OpenSSH, OpenSSL, and Rsync.
 - Supports authorized keys and password authentication for `root` and `shell`.
 - Starts SSH sessions with a private `devpts` instance.
+- Starts SSH in the primary mount namespace, so sessions can reach internal
+  storage at `/sdcard` and `/storage/emulated/0`.
 - Includes a WebUI for service control, keys, settings, and raw configuration.
 
 ## Install the module

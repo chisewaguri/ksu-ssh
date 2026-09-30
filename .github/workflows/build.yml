@@ -84,6 +84,7 @@ jobs:
           sh tests/test-passwd.sh
           sh tests/test-password-crypt.sh
           sh tests/test-uninstall-links.sh
+          sh tests/test-private-devpts.sh
           node tests/test-webui-bridge.mjs
           node tests/test-webui-app.mjs stale
           node tests/test-webui-app.mjs concurrent

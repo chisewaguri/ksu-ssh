@@ -24,5 +24,7 @@ awk '
     END { exit !found }
 ' "$root/main.mk"
 grep -Fq 'unshare(CLONE_NEWNS)' "$root/native/sshd-private-devpts.c"
+grep -Fq 'setns(fd, CLONE_NEWNS)' "$root/native/sshd-private-devpts.c"
+grep -Fq 'open("/proc/1/ns/mnt"' "$root/native/sshd-private-devpts.c"
 grep -Fq 'newinstance,ptmxmode=0666,mode=0620,gid=2000' \
     "$root/native/sshd-private-devpts.c"
