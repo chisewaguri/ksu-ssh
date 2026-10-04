@@ -6,11 +6,13 @@ mkdir -p "$TMPDIR" /data/adb/ssh/bin /data/adb/ssh/usr/lib /data/adb/ssh/usr/lib
 unzip -o "$ZIPFILE" 'common/opensshd.init' -d "$MODPATH/tmp" >&2
 unzip -o "$ZIPFILE" 'common/wrapper' -d "$MODPATH/tmp" >&2
 unzip -o "$ZIPFILE" 'common/passwd' -d "$MODPATH/tmp" >&2
+unzip -o "$ZIPFILE" 'common/ksu-ssh-webui' -d "$MODPATH/tmp" >&2
 unzip -o "$ZIPFILE" "arch/$ARCH/*" -d "$TMPDIR" >&2
 
 mv "$TMPDIR/common/opensshd.init" "$MODPATH"
 mv "$TMPDIR/common/wrapper" /data/adb/ssh/usr/libexec/ssh-core
 mv "$TMPDIR/common/passwd" /data/adb/ssh/bin/
+mv "$TMPDIR/common/ksu-ssh-webui" /data/adb/ssh/bin/
 mv "$TMPDIR/arch/$ARCH/lib"/* /data/adb/ssh/usr/lib/ || abort "cannot install SSH libraries"
 mv "$TMPDIR/arch/$ARCH/bin"/* /data/adb/ssh/usr/libexec/ssh-core/ || abort "cannot install SSH binaries"
 
@@ -42,6 +44,7 @@ rm -rf "$TMPDIR" "$MODPATH/arch"
 # permissions
 chmod -R 755 /data/adb/ssh/usr/libexec/ssh-core
 chmod 755 /data/adb/ssh/bin/passwd
+chmod 755 /data/adb/ssh/bin/ksu-ssh-webui
 chmod -R 644 /data/adb/ssh/usr/lib/*
 chmod 755 "$MODPATH/opensshd.init"
 chmod 600 /data/ssh/sshd_config /data/ssh/etc/shadow
