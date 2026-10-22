@@ -2,5 +2,5 @@
     "version": "v0.27",
     "versionCode": 27,
     "zipUrl": "https://github.com/chisewaguri/ksu-ssh/releases/-/raw/main/ksu_ssh_v0.27.zip",
-    "changelog": "https://github.com/chisewaguri/ksu-ssh/-/raw/main/module_data/README.md"
+    "changelog": "https://raw.githubusercontent.com/chisewaguri/ksu-ssh/main/CHANGELOG.md"
 }
