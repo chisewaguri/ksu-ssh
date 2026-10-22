@@ -1,0 +1,119 @@
+name: Build ksu-ssh
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'update.json'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'update.json'
+  workflow_dispatch:
+
+env:
+  NDK_VER: r25c
+  NDK_PATH: /opt/android-ndk
+  CCACHE_DIR: /tmp/ccache
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y make wget python3 p7zip-full ccache libssl-dev
+
+      - name: Cache source archives
+        uses: actions/cache@v4
+        with:
+          path: dl
+          key: dl-${{ hashFiles('checksums/*.sha512') }}
+
+      - name: Cache Android NDK
+        id: cache-ndk
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.NDK_PATH }}
+          key: ndk-${{ env.NDK_VER }}
+
+      - name: Setup Android NDK
+        if: steps.cache-ndk.outputs.cache-hit != 'true'
+        run: |
+          wget -q https://dl.google.com/android/repository/android-ndk-$NDK_VER-linux.zip
+          unzip -q android-ndk-$NDK_VER-linux.zip -d /opt
+          mv /opt/android-ndk-$NDK_VER $NDK_PATH
+          rm android-ndk-$NDK_VER-linux.zip
+
+      - name: Setup ccache
+        run: |
+          NDK_BIN="$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          for suffix in 24 26 28 30 32 34; do
+            ln -sf $(which ccache) /usr/local/bin/armv7a-linux-androideabi${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/aarch64-linux-android${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/i686-linux-android${suffix}-clang
+            ln -sf $(which ccache) /usr/local/bin/x86_64-linux-android${suffix}-clang
+          done
+          ccache --max-size=2G --zero-stats
+
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: ccache-${{ github.ref_name }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ github.ref_name }}-
+            ccache-
+
+      - name: Add NDK to PATH
+        run: echo "$NDK_PATH/toolchains/llvm/prebuilt/linux-x86_64/bin" >> $GITHUB_PATH
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          sh tests/test-webui-controller.sh
+          sh tests/test-webui-static.sh
+          sh tests/test-passwd.sh
+          sh tests/test-password-crypt.sh
+          sh tests/test-uninstall-links.sh
+          sh tests/test-private-devpts.sh
+          node tests/test-webui-bridge.mjs
+          node tests/test-webui-app.mjs stale
+          node tests/test-webui-app.mjs concurrent
+          node tests/test-webui-app.mjs state
+          mkdir -p build
+          cd build
+          make -f ../all_arches.mk -j$(nproc) zip ANDROID_ROOT=$NDK_PATH
+          ccache --show-stats
+
+      - name: Inspect WebUI package
+        run: |
+          set -euo pipefail
+          ZIP=$(find build -maxdepth 1 -name '*.zip' -print -quit)
+          test -n "$ZIP"
+          unzip -l "$ZIP" | grep -q 'webroot/index.html'
+          unzip -l "$ZIP" | grep -q 'webroot/app.js'
+          unzip -l "$ZIP" | grep -q 'webroot/style.css'
+          unzip -l "$ZIP" | grep -q 'common/ksu-ssh-webui'
+
+      - name: Generate artifact name
+        id: name
+        run: |
+          VERSION=$(sed -n 's/^version=//p' module_data/module.prop)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "artifact=ksu-ssh-$VERSION-${GITHUB_SHA:0:7}" >> $GITHUB_OUTPUT
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.name.outputs.artifact }}
+          path: build/module/ksu_ssh_standalone/*
+          if-no-files-found: error
