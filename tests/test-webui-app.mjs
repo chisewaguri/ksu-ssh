@@ -40,6 +40,7 @@ globalThis.btoa = (value) => Buffer.from(value, "binary").toString("base64");
 
 let config = "Port 22\nPasswordAuthentication yes\nPermitRootLogin prohibit-password\n";
 let completedSets = 0;
+let appBound = "0";
 globalThis.ksu = {
   exec(commandLine, _options, callbackName) {
     const [command, ...args] = [...commandLine.matchAll(/'([^']*)'/g)].map((match) => match[1]);
@@ -47,7 +48,7 @@ globalThis.ksu = {
     const snapshot = config;
     setTimeout(() => {
       let output = "";
-      if (args[0] === "state") output = "state\trunning\nport\t22\naddress\t192.168.1.42\n";
+      if (args[0] === "state") output = `state\trunning\nport\t22\naddress\t192.168.1.42\napp-bound\t${appBound}\n`;
       if (args[0] === "keys") output = "";
       if (args[0] === "settings" && args[1] === "get") {
         output = `autostart\t1\nport\t22\npassword-auth\t${config.includes("PasswordAuthentication yes") ? 1 : 0}\nroot-login\t${config.includes("PermitRootLogin no") ? "disabled" : "keys"}\n`;
@@ -107,6 +108,13 @@ if (process.argv[2] === "stale") {
   assert.equal(get("autostart").checked, true);
   assert.equal(get("address-row").hidden, false);
   assert.equal(get("address-command").textContent, "ssh shell@192.168.1.42 -p 22");
+  assert.equal(get("service-detail").hidden, true);
+  for (const [value, message] of [["1", "Stops when KernelSU closes. Try Restart"], ["unknown", "Cannot verify SSH survives closing the manager"]]) {
+    appBound = value;
+    await get("service-restart").trigger("click");
+    assert.equal(get("service-detail").hidden, false);
+    assert.equal(get("service-detail").textContent, message);
+  }
 } else {
   assert.fail("choose stale, concurrent or state");
 }

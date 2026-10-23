@@ -29,6 +29,7 @@ text encoded as base64:
 state\trunning|stopped
 port\tPORT
 address\tIPV4_OR_EMPTY
+app-bound\t0|1|unknown
 key\tBASE64_PUBLIC_KEY\tBASE64_SSH_KEYGEN_OUTPUT
 autostart\t0|1
 password-auth\t0|1
@@ -42,10 +43,21 @@ Failures print an error to stderr and exit nonzero.
 ## Service state and startup
 
 `state` reads the configured `PidFile`, defaulting to `/data/ssh/sshd.pid`.
-It checks that the PID exists. `opensshd.init` has no status action.
+It checks that the PID exists and its executable matches the installed sshd.
+`opensshd.init` has no status action.
 
 `address` is the default route's source IPv4 address, falling back to the first
 non-loopback IPv4 address. It is empty without a network address.
+
+Some manager WebUI shells stay in the app's cgroup, so Android can kill their
+children when the app closes. Start and restart use `su -c` because KernelSU
+and APatch `su` leave those cgroups. Without `su`, startup runs directly.
+
+`app-bound` describes the running daemon's cgroup membership:
+
+- `1`: an app or UID group. The page warns that SSH stops with the manager.
+- `0`: only root or `/system` groups were found.
+- `unknown`: unreadable or unrecognized membership. The page shows a warning.
 
 Every start must use
 `/data/adb/ssh/usr/libexec/ssh-core/sshd-private-devpts`:

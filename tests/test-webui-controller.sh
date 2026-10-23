@@ -10,7 +10,8 @@ core=$tmp/core
 module=$tmp/module
 bin=$tmp/bin
 log=$tmp/service.log
-mkdir -p "$data/root/.ssh" "$data/shell/.ssh" "$core" "$module" "$bin"
+proc=$tmp/proc
+mkdir -p "$proc" "$data/root/.ssh" "$data/shell/.ssh" "$core" "$module" "$bin"
 : > "$data/root/.ssh/authorized_keys"
 : > "$data/shell/.ssh/authorized_keys"
 
@@ -47,6 +48,12 @@ cat > "$bin/private-devpts" <<EOF
 echo "launcher \$*" >> "$log"
 exec "\$@"
 EOF
+cat > "$bin/su" <<EOF
+#!/bin/sh
+[ "\$1" = -c ] || exit 1
+echo "su \$2" >> "$log"
+exec sh -c "\$2"
+EOF
 cat > "$bin/ip" <<'EOF'
 #!/bin/sh
 case "$*" in
@@ -54,10 +61,21 @@ case "$*" in
     "-4 addr show") printf '    inet 127.0.0.1/8 scope host lo\n    inet 10.0.0.7/24 brd 10.0.0.255 scope global wlan0\n' ;;
 esac
 EOF
-chmod 755 "$bin/sshd" "$bin/private-devpts" "$bin/ip" "$module/opensshd.init"
+chmod 755 "$bin/sshd" "$bin/private-devpts" "$bin/su" "$bin/ip" "$module/opensshd.init"
+
+real_readlink=$(command -v readlink)
+cat > "$bin/readlink" <<EOF
+#!/bin/sh
+case "\$1" in
+    "$proc"/*/exe) cat "\$1" ;;
+    *) exec "$real_readlink" "\$@" ;;
+esac
+EOF
+chmod 755 "$bin/readlink"
 
 controller=$root/module_data/common/ksu-ssh-webui
 run() {
+    PATH="$bin:$PATH" \
     SSH_DATA_DIR=$data \
     SSH_CORE_DIR=$core \
     SSH_MODULE_DIR=$module \
@@ -67,6 +85,8 @@ run() {
     SSH_PRIVATE_DEVPTS=$bin/private-devpts \
     SSH_PID_FILE=$data/sshd.pid \
     SSH_IP_BIN=$bin/ip \
+    SSH_SU_BIN=${SSH_SU_BIN:-$bin/su} \
+    SSH_PROC_DIR=$proc \
     SSH_TEST_NO_ROUTE=${SSH_TEST_NO_ROUTE:-} \
     SSH_ROOT_UID=$(id -u) SSH_ROOT_GID=$(id -g) \
     SSH_SHELL_UID=$(id -u) SSH_SHELL_GID=$(id -g) \
@@ -110,8 +130,25 @@ printf '%s\n' "$state" | grep -q '^address	10.0.0.7$'
 sleep 30 &
 service_pid=$!
 printf '%s\n' "$service_pid" > "$data/sshd.pid"
+mkdir -p "$proc/$service_pid"
+readlink -f "$bin/sshd" > "$proc/$service_pid/exe"
 state=$(run state)
 printf '%s\n' "$state" | grep -q '^state	running$'
+printf '%s\n' "$state" | grep -q '^app-bound	unknown$'
+mkdir -p "$proc/$service_pid"
+printf '0::/apps/uid_10293/pid_4000\n' > "$proc/$service_pid/cgroup"
+state=$(run state)
+printf '%s\n' "$state" | grep -q '^app-bound	1$'
+printf '0::/\n' > "$proc/$service_pid/cgroup"
+state=$(run state)
+printf '%s\n' "$state" | grep -q '^app-bound	0$'
+printf '4:memory:/uid_10293/pid_4000\n0::/\n' > "$proc/$service_pid/cgroup"
+state=$(run state)
+printf '%s\n' "$state" | grep -q '^app-bound	1$'
+rm "$proc/$service_pid/exe"
+printf /not/sshd > "$proc/$service_pid/exe"
+state=$(run state)
+printf '%s\n' "$state" | grep -q '^state	stopped$'
 kill "$service_pid"
 wait "$service_pid" 2>/dev/null || true
 service_pid=
@@ -185,10 +222,18 @@ grep -q '^Port 2200$' "$data/sshd_config"
 [ "$(stat -c %i "$data/sshd_config")" != "$before_inode" ]
 
 run service restart
+grep -q "^su exec '$bin/private-devpts' '$module/opensshd.init' start$" "$log"
 grep -q '^init stop$' "$log"
 grep -q '^launcher .*opensshd.init start$' "$log"
 if grep -q '^init restart$' "$log"; then
     echo "restart bypassed private devpts" >&2
+    exit 1
+fi
+: > "$log"
+SSH_SU_BIN=$tmp/missing-su run service start
+grep -q '^launcher .*opensshd.init start$' "$log"
+if grep -q '^su ' "$log"; then
+    echo "missing su was used" >&2
     exit 1
 fi
 

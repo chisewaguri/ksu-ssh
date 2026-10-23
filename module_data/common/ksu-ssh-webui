@@ -17,6 +17,8 @@ CONFIG=$DATA_DIR/sshd_config
 CONFIG_LOCK=$CONFIG.lock
 PID_FILE=${SSH_PID_FILE:-}
 IP_BIN=${SSH_IP_BIN:-ip}
+SU_BIN=${SSH_SU_BIN:-su}
+PROC_DIR=${SSH_PROC_DIR:-/proc}
 
 export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/data/adb/ssh/usr/lib}
 umask 077
@@ -258,13 +260,37 @@ settings_set() {
 	esac
 }
 
+# The WebUI shell stays in the manager app's cgroup, which Android kills when
+# the app closes. KernelSU and APatch su leave the app cgroups before running
+# the command, so sshd started through su outlives the manager.
+start_sshd() {
+	if command -v "$SU_BIN" >/dev/null 2>&1; then
+		"$SU_BIN" -c "exec '$PRIVATE_DEVPTS' '$INIT_SCRIPT' start"
+	else
+		"$PRIVATE_DEVPTS" "$INIT_SCRIPT" start
+	fi
+}
+
+# Uses running_pid from service_running. Unreadable memberships are not safe.
+service_app_bound() {
+	membership=$(cat "$PROC_DIR/$running_pid/cgroup" 2>/dev/null) || { printf unknown; return; }
+	[ -n "$membership" ] || { printf unknown; return; }
+	if printf '%s\n' "$membership" | grep -Eq '^[^:]*:[^:]*:/(apps|uid_[0-9]+)(/|$)'; then
+		printf 1
+	elif printf '%s\n' "$membership" | awk -F: 'NF != 3 || $3 !~ /^\/(system)?$/ { bad=1 } END { exit bad }'; then
+		printf 0
+	else
+		printf unknown
+	fi
+}
+
 service_action() {
 	case "$1" in
-		start) "$PRIVATE_DEVPTS" "$INIT_SCRIPT" start ;;
+		start) start_sshd ;;
 		stop) "$INIT_SCRIPT" stop ;;
 		restart)
 			"$INIT_SCRIPT" stop || true
-			"$PRIVATE_DEVPTS" "$INIT_SCRIPT" start
+			start_sshd
 			;;
 		*) fail "invalid service action" ;;
 	esac
@@ -278,7 +304,8 @@ service_running() {
 		''|*[!0-9]*) return 1 ;;
 	esac
 	[ "$running_pid" -gt 1 ] 2>/dev/null || return 1
-	kill -0 "$running_pid" 2>/dev/null
+	kill -0 "$running_pid" 2>/dev/null || return 1
+	[ "$(readlink "$PROC_DIR/$running_pid/exe" 2>/dev/null)" = "$(readlink -f "$SSHD_BIN")" ]
 }
 
 local_address() {
@@ -294,8 +321,13 @@ local_address() {
 command=${1:-}
 case "$command" in
 	state)
-		if service_running; then state=running; else state=stopped; fi
-		printf 'state\t%s\nport\t%s\naddress\t%s\n' "$state" "$(config_value Port 22)" "$(local_address)"
+		state=stopped
+		app_bound=0
+		if service_running; then
+			state=running
+			app_bound=$(service_app_bound)
+		fi
+		printf 'state\t%s\nport\t%s\naddress\t%s\napp-bound\t%s\n' "$state" "$(config_value Port 22)" "$(local_address)" "$app_bound"
 		;;
 	service)
 		[ "$#" -eq 2 ] || fail "usage: service start|stop|restart"

@@ -109,8 +109,11 @@ async function loadService() {
   const address = values.address || "";
   $("#status").dataset.state = state.running ? "running" : "stopped";
   $("#service-title").textContent = state.running ? "Running" : "Stopped";
-  $("#service-detail").textContent = state.running ? "No network connection" : `Port ${values.port}`;
-  $("#service-detail").hidden = state.running && address !== "";
+  const appBound = state.running && values["app-bound"] === "1";
+  const unknown = state.running && values["app-bound"] !== "0" && !appBound;
+  $("#service-detail").textContent = unknown ? "Cannot verify SSH survives closing the manager" : appBound ? "Stops when KernelSU closes. Try Restart"
+    : state.running ? "No network connection" : `Port ${values.port}`;
+  $("#service-detail").hidden = state.running && address !== "" && !appBound && !unknown;
   $("#address-row").hidden = !state.running || !address;
   $("#address-command").textContent = address ? `ssh shell@${address} -p ${values.port}` : "";
   const toggle = $("#service-toggle");
